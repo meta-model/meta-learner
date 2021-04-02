@@ -6,16 +6,10 @@
   <li>The other files represent the implementation of recommendation algorithms.</li>
 </ul>
 
-<h3>Requirement:</h3>
+<h3>Prerequisites:</h3>
+Before you begin, ensure you have met the following requirements:
+
 <ul>
-  <li>pandas>=1.1.0</li>
-  <li>numpy>=1.19.5</li>
-  <li>scipy>=1.6.0</li>
-  <li>implicit>=0.4.2</li>
-  <li>pyspark>=3.0.0</li>
-  <li>tensorflow==1.14.0</li>
-  <li>scikit-learn>=0.21.3</li>
-  <li>xgboost>=1.1.1</li>
-  <li>tffm==1.0.1</li>
-  <li>pywFM==0.9.0</li>
+  <li>You have python3 installed</li>
+  <li>You have installed requirements</li>
 </ul>
