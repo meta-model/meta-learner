@@ -4,6 +4,7 @@ import scipy.sparse as sparse
 import scipy.sparse.linalg as linalg
 import multiprocessing
 
+
 def worker(i,X):
     if (i<99) & (i>0):
         c2 = X[i*2735:(i+1)*2735,:]
