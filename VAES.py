@@ -9,7 +9,7 @@ class MultiVAE (object) :
         q_dims : Dimension of Inference part
         lam : Regularization rate
         lr : Learning Rate
-    '''
+    ''' 
     def __init__(self, p_dims, q_dims=None, lam=0.01, lr=1e-3, random_seed=None):
         tf.compat.v1.disable_eager_execution()
         self.p_dims = p_dims #Dimensions of generative part
