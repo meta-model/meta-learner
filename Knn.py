@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.sparse as sparse
+import scipy.sparse as sparse 
 import time
 
 class KNN(object):
