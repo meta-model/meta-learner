@@ -18,6 +18,7 @@ import pool_algos
 from SpectralCf import SpectralCF
 import tensorflow as tf
 import random as rd
+from tffm import TFFMRegressor
 
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.linear_model import LinearRegression, SGDRegressor
@@ -114,7 +115,7 @@ vaes_res = reco_algo.res
 
 data_train = data_train.groupby(['CUST_ID','ARTICLE_ID'])['RATING'].mean().reset_index(name='FREQUENCY')
 
-#NEEEEEW
+#Frequency of items and users
 
 nb_purch_train = data_train.groupby('CUST_ID')['FREQUENCY'].size().reset_index(name='NB_PURCH_TRAIN')
 nb_article_purch_train = data_train.groupby('ARTICLE_ID')['FREQUENCY'].size().reset_index(name='NB_ARTICLE_PURCH_TRAIN')
@@ -128,15 +129,47 @@ nb_purch_test.to_csv(d+'/nb_purch_test.csv', index=False)
 nb_article_purch_train.to_csv(d+'/nb_article_purch_train.csv', index=False)
 nb_article_purch_test.to_csv(d+'/nb_article_purch_test.csv', index=False)
 
-### Train Pool of recommendation algorithms
+# Data for Factorization Machines
+data_train_FM = pd.merge(data_train,nb_purch_test, on='CUST_ID')
+data_train_FM = pd.merge(data_train_FM,nb_article_purch_test, on='ARTICLE_ID')
 
-########################################################################
+data_train_FM.CUST_ID = data_train_FM.CUST_ID.astype('object')
+data_train_FM.ARTICLE_ID = data_train_FM.ARTICLE_ID.astype('object')
+
+object_col = data_train_FM.drop(columns=['ARTICLE_ID']).dtypes == 'object'
+object_col = list( object_col[object_col].index )
+
+OH_encoder = OneHotEncoder(handle_unknown='ignore', sparse=False) #One Hot Encoder
+OH_cols_train = pd.DataFrame(OH_encoder.fit_transform(data_train_FM[object_col]))
+
+user_FM = data_train_FM[object_col]
+OH_cols_train.index = data_train_FM.index
+user_FM = pd.concat([user_FM, OH_cols_train], axis=1)
+
+object_col = ['ARTICLE_ID']
+
+OH_encoder = OneHotEncoder(handle_unknown='ignore', sparse=False) #One Hot Encoder
+OH_cols_train = pd.DataFrame(OH_encoder.fit_transform(data_train_FM[object_col]))
+
+item_FM = data_train_FM[object_col]
+OH_cols_train.index = data_train_FM.index
+item_FM = pd.concat([item_FM, OH_cols_train], axis=1)
+
+data_train_FM.to_csv(d+'/data_train_FM.csv',index=False)
+
+item_FM = item_FM.drop_duplicates()
+user_FM = user_FM.drop_duplicates()
+
+item_FM.to_csv(d+'/item_FM.csv',index=False)
+user_FM.to_csv(d+'/user_FM.csv',index=False)
+
+### Train Pool of recommendation algorithms
 num = nm
 
 items = list(np.sort(data_train.ARTICLE_ID.unique()))  # all unique items
 users = list(np.sort(data_train.CUST_ID.unique()))    # all unique users
 rating = list(np.sort(data_train.FREQUENCY))
-########################################################################
+
 rows = data_train.CUST_ID.astype(pd.api.types.CategoricalDtype(categories = users)).cat.codes    # Get the associated row indices
 cols = data_train.ARTICLE_ID.astype(pd.api.types.CategoricalDtype(categories = items)).cat.codes    # Get the associated row indices
 
@@ -190,23 +223,19 @@ c = sparse.diags(1/c2) # ||P.j||
 
 Association_matrix= c.dot(Association_matrix)
 
-print(Association_matrix.shape)
 print(' #------------------ ARM ... Done !-------------------#')
 
 nmf_pure = nmf.NMFRecommender(data)
-nmf_pure.fit(num_factors=200)
+nmf_pure.fit()
 print(' #------------------ NMF ... Done !-------------------#')
 
 svd_pure = svd.PureSVDRecommender(data)
 svd_pure.fit()
 print(' #------------------ SVD Pure ... Done !-------------------#')
 
-
 Similarity_matrix = pp.normalize(data.tocsc(), axis=0)
 Similarity_matrix = Similarity_matrix.T * Similarity_matrix
 print('SIMILARITY DONE')
-
-print(Similarity_matrix.shape)
 
 knn100 = Knn.KNN(data)
 knn100.fit(Similarity_matrix, selectTopK = True, topK=100)
@@ -245,8 +274,11 @@ def sample():
     for u in users_:
         pos_items += sample_pos_items_for_u(u, 1)
         neg_items += sample_neg_items_for_u(u, 1)
+    
+    print('END SAMPLE')
 
     return users_, pos_items, neg_items
+
 
 EMB_DIM = 128
 BATCH_SIZE = 512
@@ -272,8 +304,6 @@ sess.run(tf.compat.v1.global_variables_initializer())
 print("Training model... ")
 
 res_spec = dict()
-
-########################################################################
 
 test_set = data_train_meta[['CUST_ID', 'ARTICLE_ID']]
 test = data_train_meta
@@ -353,7 +383,6 @@ for epoch in range(N_EPOCH):
 
 with open(d+'/res_spec', 'w') as fil:
     print(res_spec, file=fil)
-########################################################################
 
 print('Train Done')
 print('Meta training , num of users :',len(test_dict.keys()))
@@ -550,7 +579,7 @@ def top_N_SPECTRAL(user, n, validation_values):
     if user in users_d:
         user_ind = users_d[user]
         user_ind_v = 0
-        
+
         pred = res_spec[user]
 
         items_purchased = get_purchased(user_ind, user_ind_v, validation_values) ##
@@ -651,7 +680,6 @@ def worker_rank(i,key, value, classifier, classifier2):
             classifier[key,item] = clas
             classifier2[key,item] = clas2
 
-
 results=[]
 manager = multiprocessing.Manager()
 precisions = manager.dict()
@@ -662,7 +690,7 @@ print('Num of Process : ',pool._processes)
 
 for i,(key,value) in enumerate(test_dict.items()):
     result = pool.apply_async(worker_rank,args=(i,key,value,precisions,precisions_score))
-    #result.get()
+    result.get()
 pool.close()
 pool.join()
 
@@ -691,7 +719,6 @@ data_prec.to_csv(d+'/data_prec.csv', index=False)
 '''
 data_prec = pd.read_csv(d+'/data_prec.csv')
 #'''
-
 
 data_prec_score = pd.DataFrame.from_dict(precisions_score,orient='index')
 data_prec_score.rename(columns=col_score,inplace=True)
@@ -744,7 +771,6 @@ for u in test.CUST_ID.unique():
     test2 = test2.append(inter, ignore_index = True)
 
 test = test2
-#test.to_csv(d+'/test_test_2.csv', index=False)
 del test2
 
 # Create a dictionnary where keys are customers and values are set of purchased products in the test set
@@ -807,6 +833,9 @@ def worker_rank2(i,key, value):
         classifier2[key,item] = clas2
 
         k=k+1
+    
+    print(i)
+
     return classifier, classifier2
 
 
@@ -942,7 +971,7 @@ data_test_meta_score.to_csv(d+'/data_reco_baselines_score.csv', index=False)
 train_model = train_model.append(data_prec)
 train_model.to_csv(d+'/train_model.csv', index=False)
 
-#train_model = pd.read_csv(d+'/train_model.csv')
+train_model = pd.read_csv(d+'/train_model.csv')
 
 
 data_prec_score.to_csv(d+'/train_model_score.csv', index=False)
@@ -972,7 +1001,9 @@ X_train['NB_ARTICLE_PURCH_TEST'] = x_scaled
 
 print('Categorical Columns')
 #Categorical columns
+
 object_col = train_model.dtypes == 'object'
+
 print(object_col)
 
 object_col = list( object_col[object_col].index )
