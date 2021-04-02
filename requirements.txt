@@ -1,0 +1,10 @@
+pandas>=1.1.0
+numpy>=1.19.5
+scipy>=1.6.0
+implicit>=0.4.2
+pyspark>=3.0.0
+tensorflow==1.14.0
+scikit-learn>=0.21.3
+xgboost>=1.1.1
+tffm==1.0.1
+pywFM==0.9.0
